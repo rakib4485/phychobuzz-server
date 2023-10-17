@@ -20,6 +20,9 @@ async function run() {
   try {
     await client.connect(); 
     const blogsCollection = client.db("psychologyBuzz").collection("blogs");
+    const postsCollection = client.db("psychologyBuzz").collection("posts");
+
+
     app.get('/blogs', async (req, res) => {
         const query = {};
         const blogs = await blogsCollection.find(query).toArray();
@@ -31,6 +34,47 @@ async function run() {
         const query = {_id: ObjectId(id)};
         const blogs = await blogsCollection.findOne(query);
         res.send(blogs);
+    });
+
+    app.post("/posts", async (req, res) => {
+      const user = req.body;
+      const result = await postsCollection.insertOne(user);
+      res.send(result);
+    });
+
+    app.get('/posts', async (req, res) => {
+      const query = {};
+      const posts = await postsCollection.find(query).toArray();
+      res.send(posts);
+    });
+
+    app.get("/posts/:id/comments", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const post = await postsCollection.findOne(filter);
+      const comments = await post.comments;
+      res.send(comments);
+    });
+
+     app.put("/posts/:id/comments", async (req, res) => {
+      const id = req.params.id;
+      const comment = req.body;
+      const filter = { _id: ObjectId(id) };
+      const post = await postsCollection.findOne(filter);
+      const comments = post.comments;
+      const newComments = [...comments, comment];
+      const option = { upsert: true };
+      const updatedDoc = {
+        $set: {
+          comments: newComments,
+        },
+      };
+      const result = await postsCollection.updateOne(
+        filter,
+        updatedDoc,
+        option
+      );
+      res.send(result);
     });
    
   }
