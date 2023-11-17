@@ -21,7 +21,7 @@ async function run() {
     await client.connect(); 
     const blogsCollection = client.db("psychologyBuzz").collection("blogs");
     const postsCollection = client.db("psychologyBuzz").collection("posts");
-
+    const appointmentCollection = client.db("psychologyBuzz").collection("appointments");
 
     app.get('/blogs', async (req, res) => {
         const query = {};
@@ -76,7 +76,13 @@ async function run() {
       );
       res.send(result);
     });
-   
+
+    app.get('/appointments', async(req, res) =>{
+      const query = {};
+      const result = await appointmentCollection.find(query).toArray();
+      res.send(result);
+    });
+    
   }
   finally{
 
