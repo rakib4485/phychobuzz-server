@@ -47,6 +47,17 @@ async function run() {
     const usersCollection = client.db("psychologyBuzz").collection("users");
     const appointmentOptionCollection = client.db("psychologyBuzz").collection("appointmentSpecialty");
 
+    // Note: Make sure you use verifyAdmin after verifyJWT
+    const verifyAdmin = async (req, res, next) => {
+      const decodedEmail = req.decoded.email;
+      const query = { email: decodedEmail };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "admin") {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
     app.get('/blogs', async (req, res) => {
         const query = {};
         const blogs = await blogsCollection.find(query).toArray();
@@ -120,8 +131,7 @@ async function run() {
     });
 
     app.post('/bookings', async(req, res) =>{
-      const booking = req.body
-      console.log(booking);
+      const booking = req.body;
       const query = {
         appointmentDate : booking.appointmentDate,
         email: booking.email,
@@ -133,11 +143,12 @@ async function run() {
         return res.send({acknowledged: false, message});
       }
       const result = await bookingsCollection.insertOne(booking);
-      res.send(result);
+      return res.send({acknowledged: true});
     });
 
     app.get('/bookings', async(req, res) =>{
-      const query = {};
+      const email = req.query.email;
+      const query = {email: email};
       const result  =  await bookingsCollection.find(query).toArray();
       res.send(result);
     })
@@ -175,7 +186,6 @@ async function run() {
 
     app.post('/users', async(req, res) =>{
       const user = req.body;
-      console.log(user);
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
@@ -212,10 +222,10 @@ async function run() {
       res.send(result);
     });
 
-    app.delete('/doctors/:id', verifyJWT, verifyAdmin, async(req, res) =>{
+    app.delete('/doctors/:id', verifyJWT, async(req, res) =>{
       const id = req.params.id;
       const filter = {_id: new ObjectId(id)};
-      const result = await doctorsCollection.deleteOne(filter);
+      const result = await appointmentCollection.deleteOne(filter);
       res.send(result);
     })
   }
