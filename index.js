@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion,ObjectId  } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 const app = express();
 const jwt = require('jsonwebtoken');
@@ -22,24 +22,24 @@ function verifyJWT(req, res, next) {
 
   const authHeader = req.headers.authorization;
   if (!authHeader) {
-      return res.status(401).send('unauthorized access');
+    return res.status(401).send('unauthorized access');
   }
 
   const token = authHeader.split(' ')[1];
 
   jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
-      if (err) {
-          return res.status(403).send({ message: 'forbidden access' })
-      }
-      req.decoded = decoded;
-      next();
+    if (err) {
+      return res.status(403).send({ message: 'forbidden access' })
+    }
+    req.decoded = decoded;
+    next();
   })
 
 }
 
 async function run() {
   try {
-    await client.connect(); 
+    await client.connect();
     const blogsCollection = client.db("psychologyBuzz").collection("blogs");
     const postsCollection = client.db("psychologyBuzz").collection("posts");
     const appointmentCollection = client.db("psychologyBuzz").collection("appointments");
@@ -59,16 +59,16 @@ async function run() {
     };
 
     app.get('/blogs', async (req, res) => {
-        const query = {};
-        const blogs = await blogsCollection.find(query).toArray();
-        res.send(blogs);
+      const query = {};
+      const blogs = await blogsCollection.find(query).toArray();
+      res.send(blogs);
     });
 
     app.get('/blogs/:id', async (req, res) => {
-        const id = req.params.id;
-        const query = {_id: ObjectId(id)};
-        const blogs = await blogsCollection.findOne(query);
-        res.send(blogs);
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const blogs = await blogsCollection.findOne(query);
+      res.send(blogs);
     });
 
     app.post("/posts", async (req, res) => {
@@ -91,7 +91,7 @@ async function run() {
       res.send(comments);
     });
 
-     app.put("/posts/:id/comments", async (req, res) => {
+    app.put("/posts/:id/comments", async (req, res) => {
       const id = req.params.id;
       const comment = req.body;
       const filter = { _id: ObjectId(id) };
@@ -112,66 +112,110 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/appointments', async(req, res) =>{
+    app.get('/appointments', async (req, res) => {
       const query = {};
       const result = await appointmentCollection.find(query).toArray();
       res.send(result);
     });
 
-    app.post('/appointments', async(req, res) =>{
+    app.post('/appointments', async (req, res) => {
       const appointment = req.body;
       const result = await appointmentCollection.insertOne(appointment);
       res.send(result);
     })
 
-    app.get('/appointmentSpecialty', async(req, res)=>{
+    app.get('/appointmentSpecialty', async (req, res) => {
       const query = {}
-      const result = await appointmentOptionCollection.find(query).project({name: 1}).toArray();
+      const result = await appointmentOptionCollection.find(query).project({ name: 1 }).toArray();
       res.send(result);
     });
 
-    app.post('/bookings', async(req, res) =>{
+    app.post('/bookings', async (req, res) => {
       const booking = req.body;
       const query = {
-        appointmentDate : booking.appointmentDate,
+        appointmentDate: booking.appointmentDate,
         email: booking.email,
         treatment: booking.treatment
       }
       const alreadyBooked = await bookingsCollection.find(query).toArray();
-      if (alreadyBooked.length){
+      if (alreadyBooked.length) {
         const message = `You already have an booking on ${booking.appointmentDate}`
-        return res.send({acknowledged: false, message});
+        return res.send({ acknowledged: false, message });
       }
       const result = await bookingsCollection.insertOne(booking);
-      return res.send({acknowledged: true});
+      return res.send({ acknowledged: true });
     });
 
-    app.get('/bookings', async(req, res) =>{
+    app.get('/allBookings', async(req, res) => {
+      const query = {};
+      const result = await bookingsCollection.find(query).toArray();
+      res.send(result)
+    })
+
+    app.get('/bookings', async (req, res) => {
       const email = req.query.email;
-      const query = {email: email};
-      const result  =  await bookingsCollection.find(query).toArray();
+      const query = { email: email };
+      const result = await bookingsCollection.find(query).toArray();
       res.send(result);
     })
 
-    app.get('/bookings/:id', async(req, res) =>{
+    app.get('/bookings/:id', async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)};
+      const query = { _id: new ObjectId(id) };
       const booking = await bookingsCollection.findOne(query);
       res.send(booking);
     });
 
-    app.get('/jwt', async(req, res) =>{
-      const email = req.query.email;
-      const query = {email:email};
-      const user = await usersCollection.findOne(query);
-      if(user){
-        const token  = jwt.sign({email}, process.env.ACCESS_TOKEN, {expiresIn: '1h'})
-        return res.send({accessToken: token});
+    app.put("/bookings/payment/:action", async (req, res) => {
+      const id = req.query.id;
+      const action = req.params.action;
+      const tId = req.body;
+      const filter = { _id: ObjectId(id) };
+      const booking = await bookingsCollection.findOne(filter);
+      const option = { upsert: true };
+      let updatedDoc = {};
+      if(action === 'makePayment'){
+        updatedDoc = {
+          $set: {
+            paid: tId.tId,
+          },
+        }
       }
-      res.status(403).asend({accessToken: ''})
+      else if(action === 'confirm'){
+        updatedDoc = {
+          $set: {
+            paid: 'true',
+          },
+        }
+      }
+      else{
+        updatedDoc = {
+          $set: {
+            paid: 'false',
+          },
+        }
+      }
+      const result = await bookingsCollection.updateOne(
+        filter,
+        updatedDoc,
+        option
+      );
+      res.send(result);
     });
 
-    app.get('/users', async(req, res)=>{
+    // user Related code
+    app.get('/jwt', async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user) {
+        const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' })
+        return res.send({ accessToken: token });
+      }
+      res.status(403).asend({ accessToken: '' })
+    });
+
+    app.get('/users', async (req, res) => {
       const query = {};
       const users = await usersCollection.find(query).toArray();
       res.send(users);
@@ -182,54 +226,81 @@ async function run() {
       const query = { email }
       const user = await usersCollection.findOne(query);
       res.send({ isAdmin: user?.role === 'admin' });
-  });
+    });
 
-    app.post('/users', async(req, res) =>{
+    app.get('/users/doctor/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email }
+      const user = await usersCollection.findOne(query);
+      res.send({ isDoctor: user?.role === 'doctor' });
+    });
+    app.get('/users/isUser/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email }
+      const user = await usersCollection.findOne(query);
+      res.send({ isUser: user?.role === 'user' });
+    });
+
+    app.post('/users', async (req, res) => {
       const user = req.body;
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
 
-    app.put('/users/admin/:id', verifyJWT, verifyAdmin, async(req, res) =>{
+    app.put('/users/doctor/:id', async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) }
-      const options = {upsert: true};
+      const options = { upsert: true };
       const updatedDoc = {
         $set: {
-          role: 'admin'
+          role: 'doctor'
         }
       }
       const result = await usersCollection.updateOne(filter, updatedDoc, options);
       res.send(result);
     });
 
-    app.delete('/users/:id', verifyJWT, verifyAdmin, async(req, res) =>{
+    app.delete('/users/:id', verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)};
+      const filter = { _id: new ObjectId(id) };
       const result = await usersCollection.deleteOne(filter);
       res.send(result);
     });
 
-    app.get('/doctors', verifyJWT, verifyAdmin, async(req, res) =>{
+    app.get('/doctors', verifyJWT, verifyAdmin, async (req, res) => {
       const query = {};
       const doctors = await doctorsCollection.find(query).toArray();
       res.send(doctors);
     });
 
-    app.post('/doctors', verifyJWT, verifyAdmin, async(req, res)=>{
+    app.post('/doctors', verifyJWT, verifyAdmin, async (req, res) => {
       const doctor = req.body;
       const result = await doctorsCollection.insertOne(doctor);
       res.send(result);
     });
 
-    app.delete('/doctors/:id', verifyJWT, async(req, res) =>{
+    app.delete('/doctors/:id', verifyJWT, async (req, res) => {
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)};
+      const filter = { _id: new ObjectId(id) };
       const result = await appointmentCollection.deleteOne(filter);
       res.send(result);
+    });
+
+
+    // temporary to update price field on appointment option
+    app.get('/addPrice', async(req, res) => {
+        const filter = {};
+        const option = { upsert : true };
+        const updatedDoc = {
+            $set: {
+                paid: 'false'
+            }
+        }
+        const result = await bookingsCollection.updateMany(filter, updatedDoc, option);
+        res.send(result);
     })
   }
-  finally{
+  finally {
 
   }
 }
