@@ -157,6 +157,13 @@ async function run() {
       const query = { email: email };
       const result = await bookingsCollection.find(query).toArray();
       res.send(result);
+    });
+
+    app.get('/doctorBookings', async (req, res) => {
+      const email = req.query.email;
+      const query = {doctorEmail: email};
+      const result = await bookingsCollection.find(query).toArray();
+      res.send(result);
     })
 
     app.get('/bookings/:id', async (req, res) => {
