@@ -113,9 +113,26 @@ async function run() {
     });
 
     app.get('/appointments', async (req, res) => {
+      const date = req.query.date;
       const query = {};
-      const result = await appointmentCollection.find(query).toArray();
-      res.send(result);
+      const options = await appointmentCollection.find(query).toArray();
+      const bookingQuery = { appointmentDate: date };
+      const alreadyBooked = await bookingsCollection
+        .find(bookingQuery)
+        .toArray();
+
+      // code carefully : D
+      options.forEach((option) => {
+        const optionBooked = alreadyBooked.filter(
+          (book) => book.treatment === option.name
+        );
+        const bookSlots = optionBooked.map((book) => book.slot);
+        const remainingSlots = option.slots.filter(
+          (slot) => !bookSlots.includes(slot)
+        );
+        option.slots = remainingSlots;
+      });
+      res.send(options);
     });
 
     app.post('/appointments', async (req, res) => {
@@ -155,6 +172,13 @@ async function run() {
     app.get('/bookings', async (req, res) => {
       const email = req.query.email;
       const query = { email: email };
+      const result = await bookingsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.get('/doctorBookings', async (req, res) => {
+      const email = req.query.email;
+      const query = {doctorEmail: email};
       const result = await bookingsCollection.find(query).toArray();
       res.send(result);
     })
@@ -293,7 +317,7 @@ async function run() {
         const option = { upsert : true };
         const updatedDoc = {
             $set: {
-                paid: 'false'
+                meet: 'https://meet.google.com/yez-pmjy-xsc'
             }
         }
         const result = await bookingsCollection.updateMany(filter, updatedDoc, option);
